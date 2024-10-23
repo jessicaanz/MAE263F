@@ -330,8 +330,14 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
 
 # Inputs (SI units)
 # number of vertices
-nv = 7 # Odd vs even number should show different behavior
+nv = 21 # Odd vs even number should show different behavior
 ndof = 2*nv
+
+# Indicate if all plot steps should be plotted
+plot_all = 0
+
+# Indicate if selected times from assignment 1 should be plotted
+plot_select = 1
 
 # Time step
 dt = 1e-2
@@ -366,7 +372,7 @@ visc = 1000.0
 maximum_iter = 100
 
 # Total simulation time (it exits after t=totalTime)
-totalTime = 10
+totalTime = 51
 
 # How often the plot should be saved?
 plotStep = 50
@@ -439,16 +445,31 @@ for timeStep in range(1, Nsteps):  # Python uses 0-based indexing, hence range s
     q0 = q
 
 
-    if timeStep % plotStep == 0:
+    if plot_all == 1 and timeStep % plotStep == 0:
       x1 = q[::2]  # Selects every second element starting from index 0
       x2 = q[1::2]  # Selects every second element starting from index 1
       h1 = plt.figure(1)
       plt.clf()  # Clear the current figure
       plt.plot(x1, x2, 'ko-')  # 'ko-' indicates black color with circle markers and solid lines
-      plt.title(f't={ctime:.6f}')  # Format the title with the current time
+      plt.title(f't={ctime:.2f}')  # Format the title with the current time
       plt.axis('equal')  # Set equal scaling
       plt.xlabel('x [m]')
       plt.ylabel('y [m]')
+      plt.grid()
+      plt.show()  # Display the figure
+
+    if plot_select == 1 and abs(ctime - 50) <= 0.001:
+      x1 = q[::2]  # Selects every second element starting from index 0
+      x2 = q[1::2]  # Selects every second element starting from index 1
+      h1 = plt.figure(1)
+      plt.clf()  # Clear the current figure
+      plt.plot(x1, x2, 'ko-')  # 'ko-' indicates black color with circle markers and solid lines
+      plt.title(f't={ctime:.2f}')  # Format the title with the current time
+      plt.axis('equal')  # Set equal scaling
+      plt.xlabel('x [m]')
+      plt.ylabel('y [m]')
+      plt.grid()
+      plt.savefig('final_shape_2.png')
       plt.show()  # Display the figure
 
 
@@ -466,19 +487,54 @@ t = np.linspace(0, totalTime, Nsteps)
 plt.plot(t, all_pos)
 plt.xlabel('Time, t [s]')
 plt.ylabel('Displacement, $\\delta$ [m]')
-plt.savefig('fallingBeam.png')
+plt.title('Displacement vs. Time')
+plt.grid()
+plt.savefig('fallingBeam_2.png')
 
 plt.figure(3)
 plt.plot(t, all_v)
 plt.xlabel('Time, t [s]')
 plt.ylabel('Velocity, v [m/s]')
-plt.savefig('fallingBeam_velocity.png')
+plt.title('Velocity vs. Time')
+plt.grid()
+# find terminal velocity
+index_50 = (np.abs(t - 50)).argmin()
+v_50 = all_v[index_50]
+print(v_50)
+plt.text(42, v_50+0.0002, f'v={v_50:.6f} m/s', fontsize=8)
+plt.savefig('fallingBeam_velocity_2.png')
 
 plt.figure(4)
 plt.plot(t, midAngle, 'r')
 plt.xlabel('Time, t [s]')
 plt.ylabel('Angle, $\\alpha$ [deg]')
-plt.savefig('fallingBeam_angle.png')
+plt.title('Turning Angle vs. Time')
+plt.grid()
+plt.savefig('fallingBeam_angle_2.png')
 
 plt.show()
 
+
+# Plot terminal velocity vs. nodes and step size
+nodes_1 = np.array([3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23])
+terminal_vel_1 = np.array([-0.006914444444, -0.005462592595, -0.004538686945, -0.003899060659, -0.00343000464, -0.003071324334, -0.002788176597, -0.002558998872, -0.0023697349, -0.00221083102, -0.002075566869])
+step_size = np.array([10, 5, 2, 1, 0.5, 0.1, 0.01, 0.005])
+terminal_vel_2 = np.array([-0.002236090834, -0.002216263051, -0.002211559031, -0.002211241838, -0.002211007216, -0.002210859786, -0.00221083102, -0.002210829466])
+
+plt.figure(5)
+plt.plot(nodes_1, terminal_vel_1, 'bo-')
+plt.xlabel('Nodes')
+plt.ylabel('Terminal Velocity, [m/s]')
+plt.title('Terminal Velocity vs. Nodes')
+plt.grid()
+plt.savefig('termv_vs_nodes.png')
+
+plt.figure(6)
+plt.plot(step_size, terminal_vel_2, 'bo-')
+plt.xlabel('Step Size, [s]')
+plt.ylabel('Terminal Velocity, [m/s]')
+plt.title('Terminal Velocity vs. Nodes')
+plt.grid()
+plt.savefig('termv_vs_stepsize.png')
+
+plt.show()

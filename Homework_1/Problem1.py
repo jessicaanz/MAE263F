@@ -331,8 +331,8 @@ def explicit_objfun(q_old, u_old, dt,
             deltaL):
 
     # Get elastic forces
-    Fb, _ = getFb(q_old, EI, deltaL)
-    Fs, _ = getFs(q_old, EA, deltaL)
+    Fb, Jb = getFb(q_old, EI, deltaL)
+    Fs, Js = getFs(q_old, EA, deltaL)
 
     # Viscous force
     Fv = -C @ u_old
@@ -341,7 +341,7 @@ def explicit_objfun(q_old, u_old, dt,
     F_total = Fb + Fs + W + Fv
 
     # Compute new position explicitly
-    q_new = dt * (q_old + (dt*u_old) + ((dt**2)*(-F_total/m)))
+    q_new = q_old + (dt*u_old) + ((dt**2)*(F_total/m))
 
     return q_new
 
@@ -477,7 +477,7 @@ for timeStep in range(1, Nsteps):  # Python uses 0-based indexing, hence range s
       h1 = plt.figure(1)
       plt.clf()  # Clear the current figure
       plt.plot(x1, x2, 'ko-')  # 'ko-' indicates black color with circle markers and solid lines
-      plt.title(f't={ctime:.6f}')  # Format the title with the current time
+      plt.title(f't={ctime:.2f}')  # Format the title with the current time
       plt.axis('equal')  # Set equal scaling
       plt.xlabel('x [m]')
       plt.ylabel('y [m]')
@@ -508,7 +508,7 @@ for timeStep in range(1, Nsteps):  # Python uses 0-based indexing, hence range s
                 plt.savefig(f'implicit_time{ctime:.2f}.png')
             else:
                 plt.savefig(f'explicit_time{ctime:.2f}.png')
-            #plt.show()  # Display the figure
+            plt.show()  # Display the figure
 
     u = (q - q0) / dt  # velocity
     ctime += dt  # current time
