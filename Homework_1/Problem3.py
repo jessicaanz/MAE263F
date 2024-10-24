@@ -13,6 +13,7 @@ def crossMat(a):
 
     return A
 
+
 ### GRADIENT AND HESSIAN OF ELASTIC ENERGIES ###
 
 def gradEb(xkm1, ykm1, xk, yk, xkp1, ykp1, curvature0, l_k, EI):
@@ -284,8 +285,9 @@ def getFs(q, EA, deltaL):
 def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
            m, mMat,  # inertia
            EI, EA,   # elastic stiffness
-           W, C,     # external force
-           deltaL):
+           P,     # external force
+           deltaL,
+           free_index): # free_index indicates the DOFs that evolve under equations of motion
 
     q_new = q_guess.copy()
 
@@ -299,25 +301,28 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
         Fb, Jb = getFb(q_new, EI, deltaL)
         Fs, Js = getFs(q_new, EA, deltaL)
 
-        # Viscous force
-        Fv = -C @ (q_new - q_old) / dt
-        Jv = -C / dt
-
         # Equation of motion
-        f = m * (q_new - q_old) / dt**2 - m * u_old / dt - (Fb + Fs + W + Fv)
+        f = m * (q_new - q_old) / dt**2 - m * u_old / dt - (Fb + Fs + P)
 
         # Manipulate the Jacobians
-        J = mMat / dt**2 - (Jb + Js + Jv)
+        J = mMat / dt**2 - (Jb + Js)
+
+        # We have to separate the "free" parts of f and J
+        f_free = f[free_index]
+        J_free = J[np.ix_(free_index, free_index)]
 
         # Newton's update
-        q_new = q_new - np.linalg.solve(J, f)
+        # We have to only update the free DOFs
+        dq_free = np.linalg.solve(J_free, f_free)
+        q_new[free_index] = q_new[free_index] - dq_free
 
         # Get the norm
-        error = np.linalg.norm(f)
+        # We have to calculate the errors based on free DOFs
+        error = np.linalg.norm(f_free)
 
         # Update iteration number
         iter_count += 1
-        # print(f'Iter={iter_count-1}, error={error:.6e}') # comment out to avoid spamming
+        # print(f'Iter={iter_count-1}, error={error:.6e}')
 
         if iter_count > maximum_iter:
             flag = -1  # return with an error signal
@@ -330,57 +335,49 @@ def objfun(q_guess, q_old, u_old, dt, tol, maximum_iter,
 
 # Inputs (SI units)
 # number of vertices
-nv = 21 # Odd vs even number should show different behavior
+nv = 50 # Odd vs even number should show different behavior
 ndof = 2*nv
-
-# Indicate if all plot steps should be plotted
-plot_all = 0
-
-# Indicate if selected times from assignment 1 should be plotted
-plot_select = 1
 
 # Time step
 dt = 1e-2
 
 # Rod Length
-RodLength = 0.10
+RodLength = 1.0 # m
 
 # Discrete length
 deltaL = RodLength / (nv - 1)
 
-# Radius of spheres
-R = np.zeros(nv)  # Vector of size N - Radius of N nodes
-R[:] = 0.005 # deltaL / 10: Course note uses deltaL/10
+# Radius of tube
 midNode = int((nv + 1) / 2)
-R[midNode -1 ] = 0.025
+r_o = 0.013
+r_i = 0.011
 
 # Densities
-rho_metal = 7000
-rho_gl = 1000
-rho = rho_metal - rho_gl
-
-# Cross-sectional radius of rod
-r0 = 1e-3
+rho_aluminum = 2700
 
 # Young's modulus
-Y = 1e9
+Y = 7e10 # Pa (70 GPa)
 
-# Viscosity
-visc = 1000.0
+# Load
+load = 2000 # N
+P_loc = 0.75 # location of load in m from left side
+P_node = round(P_loc / deltaL) + 1 # node the load is applied to
+P = np.zeros(ndof)
+P[(2*P_node) - 1] = - load
 
 # Maximum number of iterations in Newton Solver
 maximum_iter = 100
 
 # Total simulation time (it exits after t=totalTime)
-totalTime = 51
+totalTime = 1
 
 # How often the plot should be saved?
 plotStep = 50
 
 # Utility quantities
 ne = nv - 1
-EI = Y * np.pi * r0**4 / 4
-EA = Y * np.pi * r0**2
+EI = Y * (np.pi/4) * (r_o**4 - r_i**4)
+EA = Y * np.pi * (r_o**2 - r_i**2)
 
 # Tolerance on force function
 tol = EI / RodLength**2 * 1e-3  # small enough force that can be neglected
@@ -393,23 +390,10 @@ for c in range(nv):
 # Compute Mass
 m = np.zeros(ndof)
 for k in range(nv):
-  m[2*k] = 4 / 3 * np.pi * R[k]**3 * rho_metal # Mass for x_k
+  m[2*k] = (np.pi * (r_o**2 - r_i**2) * RodLength * rho_aluminum) / (nv - 1) # Mass for x_k
   m[2*k+1] = m[2*k] # Mass for y_k
 
 mMat = np.diag(m)  # Convert into a diagonal matrix
-
-# Gravity
-W = np.zeros(ndof)
-g = np.array([0, -9.8])  # m/s^2 - gravity
-for k in range(nv):
-  W[2*k]   = m[2*k] * g[0] # Weight for x_k
-  W[2*k+1] = m[2*k] * g[1] # Weight for y_k
-
-# Viscous damping matrix, C
-C = np.zeros((ndof, ndof))
-for k in range(nv):
-  C[2*k,2*k]   = 6 * np.pi * visc * R[k]
-  C[2*k+1, 2*k+1]   = 6 * np.pi * visc * R[k]
 
 # Initial conditions
 q0 = np.zeros(ndof)
@@ -420,6 +404,14 @@ for c in range(nv):
 q = q0.copy()
 u = (q - q0) / dt
 
+# Fixed vs. Free Degrees of Freedom
+
+all_DOFs = np.arange(ndof)
+fixed_index = np.array([0, 1, ndof - 1])
+
+# Get the difference of two sets using np.setdiff1d
+free_index = np.setdiff1d(all_DOFs, fixed_index)
+
 # Number of time steps
 Nsteps = round(totalTime / dt)
 
@@ -428,11 +420,13 @@ ctime = 0
 all_pos = np.zeros(Nsteps)
 all_v = np.zeros(Nsteps)
 midAngle = np.zeros(Nsteps)
+y_max = np.zeros(Nsteps)
 
 for timeStep in range(1, Nsteps):  # Python uses 0-based indexing, hence range starts at 1
-    # print(f't={ctime:.6f}') # comment out to avoid spamming
+    # print(f't={ctime:.6f}')
 
-    q, error = objfun(q0, q0, u, dt, tol, maximum_iter, m, mMat, EI, EA, W, C, deltaL)
+    q, error = objfun(q0, q0, u, dt, tol, maximum_iter, m, mMat, EI, EA, P, deltaL,
+                      free_index) # This line is different from our previous exercise
 
     if error < 0:
         print('Could not converge. Sorry')
@@ -444,32 +438,25 @@ for timeStep in range(1, Nsteps):  # Python uses 0-based indexing, hence range s
     # Update q0
     q0 = q
 
+    # find y_max
+    current_y = np.zeros(nv)
+    for i in range(nv):
+        current_y[i] = q[2*(i+1) - 1]
+    idx_max = np.argmax(np.abs(current_y))
+    y_max[timeStep] = current_y[idx_max]
 
-    if plot_all == 1 and timeStep % plotStep == 0:
+    if abs(ctime - 1) <= dt:
       x1 = q[::2]  # Selects every second element starting from index 0
       x2 = q[1::2]  # Selects every second element starting from index 1
       h1 = plt.figure(1)
       plt.clf()  # Clear the current figure
       plt.plot(x1, x2, 'ko-')  # 'ko-' indicates black color with circle markers and solid lines
-      plt.title(f't={ctime:.2f}')  # Format the title with the current time
+      plt.title(f't={ctime:.1f}')  # Format the title with the current time
       plt.axis('equal')  # Set equal scaling
       plt.xlabel('x [m]')
       plt.ylabel('y [m]')
       plt.grid()
-      plt.show()  # Display the figure
-
-    if plot_select == 1 and abs(ctime - 50) <= 0.001:
-      x1 = q[::2]  # Selects every second element starting from index 0
-      x2 = q[1::2]  # Selects every second element starting from index 1
-      h1 = plt.figure(1)
-      plt.clf()  # Clear the current figure
-      plt.plot(x1, x2, 'ko-')  # 'ko-' indicates black color with circle markers and solid lines
-      plt.title(f't={ctime:.2f}')  # Format the title with the current time
-      plt.axis('equal')  # Set equal scaling
-      plt.xlabel('x [m]')
-      plt.ylabel('y [m]')
-      plt.grid()
-      plt.savefig('final_shape_2.png')
+      plt.savefig('beam_deformation_20000.png')
       plt.show()  # Display the figure
 
 
@@ -481,60 +468,36 @@ for timeStep in range(1, Nsteps):  # Python uses 0-based indexing, hence range s
     vec2 = np.array([q[2*midNode], q[2*midNode+1], 0]) - np.array([q[2*midNode-2], q[2*midNode-1], 0])
     midAngle[timeStep] = np.degrees(np.arctan2(np.linalg.norm(np.cross(vec1, vec2)), np.dot(vec1, vec2)))
 
+# Euler Beam Theory
+c_euler = min(P_loc, RodLength-P_loc)
+y_max_euler = -1 *(load * c_euler* (RodLength**2 - c_euler**2)**1.5) / (9 * np.sqrt(3) * EI * RodLength)
+print(f'Simulation y_max = {y_max[Nsteps-1]:.6f} m')
+print(f'Theoretical y_max = {y_max_euler:.6f} m')
+
 # Plot
 plt.figure(2)
 t = np.linspace(0, totalTime, Nsteps)
-plt.plot(t, all_pos)
+plt.plot(t, y_max)
 plt.xlabel('Time, t [s]')
-plt.ylabel('Displacement, $\\delta$ [m]')
-plt.title('Displacement vs. Time')
+plt.ylabel('Displacement, $y_{max}$ [m]')
+plt.title('Displacement $y_{max}$ vs. Time')
 plt.grid()
-plt.savefig('fallingBeam_2.png')
-
-plt.figure(3)
-plt.plot(t, all_v)
-plt.xlabel('Time, t [s]')
-plt.ylabel('Velocity, v [m/s]')
-plt.title('Velocity vs. Time')
-plt.grid()
-# find terminal velocity
-index_50 = (np.abs(t - 50)).argmin()
-v_50 = all_v[index_50]
-print(f'Terminal Velocity = {v_50:.6f} m/s')
-plt.text(42, v_50+0.0002, f'v={v_50:.6f} m/s', fontsize=8)
-plt.savefig('fallingBeam_velocity_2.png')
-
-plt.figure(4)
-plt.plot(t, midAngle, 'r')
-plt.xlabel('Time, t [s]')
-plt.ylabel('Angle, $\\alpha$ [deg]')
-plt.title('Turning Angle vs. Time')
-plt.grid()
-plt.savefig('fallingBeam_angle_2.png')
+plt.savefig('beam_displacement_20000.png')
 
 plt.show()
 
+# Plot terminal velocity vs. load
+loads = np.array([2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000, 18000, 20000])
+simulated_tv = np.array([-0.037109, -0.072407, -0.104565, -0.132934, -0.157442, -0.178374, -0.196169, -0.211299, -0.224202, -0.235256])
+theoretical_tv = np.array([-0.038045, -0.07609, -0.114135, -0.15218, -0.190225, -0.228269, -0.266314, -0.304359, -0.342404, -0.380449])
 
-# Plot terminal velocity vs. nodes and step size
-nodes_1 = np.array([3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23])
-terminal_vel_1 = np.array([-0.006914444444, -0.005462592595, -0.004538686945, -0.003899060659, -0.00343000464, -0.003071324334, -0.002788176597, -0.002558998872, -0.0023697349, -0.00221083102, -0.002075566869])
-step_size = np.array([10, 5, 2, 1, 0.5, 0.1, 0.01, 0.005])
-terminal_vel_2 = np.array([-0.002236090834, -0.002216263051, -0.002211559031, -0.002211241838, -0.002211007216, -0.002210859786, -0.00221083102, -0.002210829466])
-
-plt.figure(5)
-plt.plot(nodes_1, terminal_vel_1, 'bo-')
-plt.xlabel('Nodes')
+plt.figure(3)
+plt.plot(loads, simulated_tv, 'bo-', label='Simulation')
+plt.plot(loads, theoretical_tv, 'go-', label='Beam Theory')
+plt.xlabel('Load [N]')
 plt.ylabel('Terminal Velocity, [m/s]')
-plt.title('Terminal Velocity vs. Nodes')
+plt.title('Terminal Velocity vs. Load')
 plt.grid()
-plt.savefig('termv_vs_nodes.png')
-
-plt.figure(6)
-plt.plot(step_size, terminal_vel_2, 'bo-')
-plt.xlabel('Step Size, [s]')
-plt.ylabel('Terminal Velocity, [m/s]')
-plt.title('Terminal Velocity vs. Nodes')
-plt.grid()
-plt.savefig('termv_vs_stepsize.png')
-
+plt.legend()
+plt.savefig('termv_vs_load.png')
 plt.show()

@@ -365,7 +365,7 @@ plot_select = 1
 if implicit == 1:
     dt = 1e-2
     plotStep = 50
-else:
+else: # explicit
     dt = 1e-5
     plotStep = 50000
 
@@ -541,6 +541,11 @@ plt.ylabel('Velocity, v [m/s]')
 plt.title('Velocity vs. Time')
 plt.grid()
 plt.savefig('fallingBeam_velocity.png')
+
+# find terminal velocity
+index_10 = (np.abs(t - 10)).argmin()
+v_10 = all_v[index_10]
+print(f'Terminal Velocity = {v_10:.6f} m/s')
 
 plt.figure(4)
 plt.plot(t, midAngle, 'r')
