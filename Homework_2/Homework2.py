@@ -996,6 +996,8 @@ for timeStep in range(Nsteps):
   # Every 100 time steps, update material directors and plot the rod
   if timeStep % 50 == 0:
     plotrod_simple(q, ctime)
+  elif abs(totalTime - ctime) <= dt:
+    plotrod_simple(q, ctime)
 
 # Visualization after the loop
 plt.figure(2)
@@ -1004,4 +1006,7 @@ plt.plot(time_array, endZ, 'ro-')
 plt.box(True)
 plt.xlabel('Time, t [sec]')
 plt.ylabel('z-coord of last node, $\\delta_z$ [m]')
+plt.title('z-Coordinate of Last Node vs. Time')
+plt.grid()
+plt.savefig('zcoordvtime.png')
 plt.show()
