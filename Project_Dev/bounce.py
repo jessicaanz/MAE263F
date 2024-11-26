@@ -29,8 +29,8 @@ class Bouncing:
             self.W[2 * c:2 * c + 2] = self.m[2 * c:2 * c + 2] * g
 
         # Initial conditions
-        self.q0 = np.array([0, 1], dtype=float)  # Initial positions
-        self.u = np.array([0.1, -0.5], dtype=float)  # Initial velocities
+        self.q0 = np.array([0.0, 0.5], dtype=float)  # Initial positions
+        self.u = np.array([0.25, -0.25], dtype=float)  # Initial velocities
         self.q = self.q0.copy()  # Current positions
 
         # Fixed and free DOFs
@@ -192,4 +192,4 @@ if __name__ == "__main__":
     )
     simulation.main_loop()
     simulation.plot_results()
-    simulation.animate_results()
+    # simulation.animate_results()
