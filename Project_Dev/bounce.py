@@ -29,8 +29,8 @@ class Bouncing:
             self.W[2 * c:2 * c + 2] = self.m[2 * c:2 * c + 2] * g
 
         # Initial conditions
-        self.q0 = np.array([0.0, 0.5], dtype=float)  # Initial positions
-        self.u = np.array([0.25, -0.25], dtype=float)  # Initial velocities
+        self.q0 = np.array([0.0, 1], dtype=float)  # Initial positions
+        self.u = np.array([0.1, 0], dtype=float)  # Initial velocities
         self.q = self.q0.copy()  # Current positions
 
         # Fixed and free DOFs
@@ -119,7 +119,7 @@ class Bouncing:
                     self.isFixed[c] = 0 # Free that node
                     q_guess[2*c] = 0.4
                     print("Reaction force in x-direction!")
-                    time.sleep(1)
+                    # time.sleep(1)
                     needCorrector = True
 
             # Corrector step
@@ -144,7 +144,7 @@ class Bouncing:
     def plot_results(self):
         plt.figure()
         plt.plot(self.all_pos[:, 0], self.all_pos[:, 1], label="Ball position 1")
-        # plt.plot(self.all_pos[:, 2], self.all_pos[:, 3], label="Ball position 2")
+        #plt.plot(self.all_pos[:, 2], self.all_pos[:, 3], label="Ball position 2")
         plt.xlabel('x [m]')
         plt.ylabel('y [m]')
         plt.title('Ball Bouncing Simulation')
