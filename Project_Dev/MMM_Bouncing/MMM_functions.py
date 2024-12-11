@@ -115,7 +115,7 @@ def ground_normal(x, A=0.1, k=20.0):
     return normal / np.linalg.norm(normal)  # Normalize the normal vector
 
 
-def test_col(q_test, u, r_force, close_d, close_off, ctime):
+def test_col(q_test, r_force, close_d):
     """
     This function tests for collision by checking the reaction force and adjusting the node positions
     based on proximity to a surface or other constraints.
@@ -129,16 +129,16 @@ def test_col(q_test, u, r_force, close_d, close_off, ctime):
 
     # Loop through each node to check for collision.
     for ii in range(int(len(q_test) / 3)):
+        # Define ground and normal vector
         node_x = q_test[ii*3]
         node_y = q_test[ii*3 + 1]
-
-        ground = ground_surface(ctime)
-        normal = ground_normal(ctime)
+        ground = ground_surface(node_x)
+        normal = ground_normal(node_x)
         p_vec = np.array([normal[0], normal[1], 0])
         p_norm = np.linalg.norm(p_vec)
         norm_vec = p_vec / p_norm # Unit P vector!!
 
-        # PROJECTION VECTOR
+        # Define projection vector
         if np.round(np.sum(r_force)) == 0: # If no reaction force, proj_vec is 0
             proj_vec = np.zeros(3)
         else:
@@ -146,32 +146,30 @@ def test_col(q_test, u, r_force, close_d, close_off, ctime):
             proj_vec = (np.dot(norm_vec, unit_r)) * norm_vec # Projected reaction force vector
 
         # COLLISION DETECTION
-        if node_y < ground:  # Below ground
-            print(f"Normal vector: {norm_vec}")
-            time.sleep(1)
+        # Condition 1: Below ground
+        if node_y < ground:
             q_con[3*ii + 1] = ground  # Set the vertical position to ground
             mat[ii] = np.array([[norm_vec[0], norm_vec[1], 0], [0, 0, 0]])  # Constrain matrix in the projected direction
-
-            # # Account for projection in velocity
-            # velocity = np.array([u[3*ii], u[3*ii +1], u[3*ii +2]])
-            # v_n = np.dot(velocity, norm_vec) * norm_vec
-            # v_t = velocity - v_n
-            # collision = -elasticity * v_n + v_t
-            # collision_u[3*ii] = collision[0]
-            # collision_u[3*ii +1] = collision[1]
-
             con_ind[ii] = ii + 1  # Constrain node
             flag = 1  # Constraint flag
 
+        # Condition 2: Within close enough distance to ground
+        elif node_y < (ground + close_d): # Within close enough distance to ground
+            free_ind[ii] = ii + 1  # Free node
+            mat[ii] = np.array([[0, 0, 0], [0, 0, 0]])  # No constraint matrix
+            close_flag = 1
+
+        # Condition 3: Above ground and no vertical reaction
         elif node_y >= ground and proj_vec[1] <= 0: # Above ground and no vertical reaction force
             free_ind[ii] = ii + 1  # Free node
             mat[ii] = np.array([[0, 0, 0], [0, 0, 0]])  # No constraint matrix
 
+        # Condition 4: All other cases
         else: # Free nodes
             free_ind[ii] = ii + 1
-            mat[ii] = np.array([[0, 0, 0], [0, 0, 0]])
+            mat[ii] = np.array([[0, 0, 0], [0, 0, 0]]) # No constraint matrix
 
-    # UPDATE INDICES
+    # Update constrained and free indices
     if len(con_ind[con_ind != 0]) >= 1: # Constrain nodes
         con_ind = get_matind(con_ind[con_ind != 0])
     else:
