@@ -98,58 +98,29 @@ def MMM_Szcalc(mat, con_ind, free_ind, q_con, q_old, u_old, dt, mass, force):
     return s_mat, z_vec
 
 
-def top_half_circle(x, radius, center_x, center_y):
+def left_circle(y, radius, center_x, center_y):
     """
-    Defines the top half of a circular surface with a given radius and center.
+    Solves for the x values on the left side of the circle for a given y value.
     """
-    distance_from_center = np.abs(x - center_x)
+    distance_from_center = np.abs(y - center_y)
     if distance_from_center <= radius:
-        y = center_y  + np.sqrt(radius**2 - (x - center_x)**2)
+        x = center_x - np.sqrt(radius**2 - (y - center_y)**2)  # Left side x values
+        return x
     else:
-        y = None
-    
-    return y
+        return None
 
-def bottom_half_circle(x, radius, center_x, center_y):
+def left_circle_normal(y, radius, center_x, center_y):
     """
-    Defines the bottom half of a circular surface with a given radius and center.
+    Computes the normal vector to the left side of the circle at a given y value.
     """
-    distance_from_center = np.abs(x - center_x)
-    if distance_from_center <= radius:
-        y = center_y  - np.sqrt(radius**2 - (x - center_x)**2)
+    x_value = left_circle(y, radius, center_x, center_y)
+    if x_value is not None:
+        normal = np.array([x_value - center_x, y - center_y])
+        magnitude = np.linalg.norm(normal)
+        if magnitude != 0:
+            return normal / magnitude
     else:
-        y = None
-    
-    return y
-
-def top_half_circle_normal(x, radius, center_x, center_y):
-    """
-    Computes the normal vector to the top half of the circle at a given x.
-    """
-    distance_from_center = np.abs(x - center_x)
-    if distance_from_center <= radius:
-        y = center_y + np.sqrt(radius**2 - (x - center_x)**2)
-        normal = np.array([x - center_x, y - center_y])
-        magnitude = np.linalg.norm(normal)
-        if magnitude == 0:
-            return np.array([0, 0])  # Avoid division by zero
-        return normal / magnitude
-    return None
-
-
-def bottom_half_circle_normal(x, radius, center_x, center_y):
-    """
-    Computes the normal vector to the bottom half of the circle at a given x.
-    """
-    distance_from_center = np.abs(x - center_x)
-    if distance_from_center <= radius:
-        y = center_y - np.sqrt(radius**2 - (x - center_x)**2)
-        normal = np.array([x - center_x, y - center_y])  # Normal vector
-        magnitude = np.linalg.norm(normal)
-        if magnitude == 0:
-            return np.array([0, 0])  # Avoid division by zero
-        return normal / magnitude
-    return None
+        return None
 
 
 def test_col(q_test, r_force, close_d):
@@ -173,33 +144,16 @@ def test_col(q_test, r_force, close_d):
         node_x = q_test[ii*3]
         node_y = q_test[ii*3 + 1]
 
-        # TOP CIRCLE COLLISION
-        top_circle_y = top_half_circle(node_x, radius, center_x, center_y)
-        top_circle_norm = top_half_circle_normal(node_x, radius, center_x, center_y)
-        if top_circle_y != None:
-            dist_top_circle = np.abs(node_y - top_circle_y)
-            print(dist_top_circle)
-            if dist_top_circle <= close_d:
-                q_con[3 * ii + 1] = top_circle_y  # Set position to top circle
-                mat[ii] = np.array([[top_circle_norm[0], top_circle_norm[1], 0], [0, 0, 0]])
+        # CIRCLE COLLISION
+        circle_x = left_circle(node_y, radius, center_x, center_y)
+        circle_x_norm = left_circle_normal(node_y, radius, center_x, center_y)
+        if circle_x != None:
+            if node_x > circle_x: # Detects collision once node passes circle!
+                q_con[3 * ii] = circle_x  # Set position to circle
+                mat[ii] = np.array([[circle_x_norm[0], circle_x_norm[1], 0], [0, 0, 0]])
                 con_ind[ii] = ii + 1
                 flag = 1
-                print("Collision with top circle!")
-                time.sleep(2)
-
-        # BOTTOM CIRCLE COLLISION
-        bottom_circle_y = bottom_half_circle(node_x, radius, center_x, center_y)
-        bottom_circle_norm = bottom_half_circle_normal(node_x, radius, center_x, center_y)
-        if bottom_circle_y != None:
-            dist_bottom_circle = np.abs(node_y - top_circle_y)
-            print(dist_bottom_circle)
-            if dist_bottom_circle <= close_d:
-                q_con[3 * ii + 1] = bottom_circle_y  # Set position to bottom circle
-                mat[ii] = np.array([[bottom_circle_norm[0], bottom_circle_norm[1], 0], [0, 0, 0]])
-                con_ind[ii] = ii + 1
-                flag = 1
-                print("Collision with bottom circle!")
-                time.sleep(2)
+                print("Collision with circle!")
 
         else:  # No collision or constraint
             free_ind[ii] = ii + 1

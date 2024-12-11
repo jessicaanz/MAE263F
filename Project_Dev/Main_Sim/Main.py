@@ -70,39 +70,48 @@ def animate_simulation(all_x_pos, all_y_pos, totalTime, Nsteps, nv):
     radius = 0.05
     center_x = 0.1
     center_y = 0.1
-    apple_x = np.linspace(0.05, 0.15, 1000)
-    circle_top = np.zeros(len(apple_x))
-    circle_bottom = np.zeros(len(apple_x))
-    for i in range(len(apple_x)):
-        x = apple_x[i]
-        circle_top[i] = MMMadj.top_half_circle(x, radius, center_x, center_y)
-        circle_bottom[i] = MMMadj.bottom_half_circle(x, radius, center_x, center_y)
+    apple_y = np.linspace(center_y - radius, center_y + radius, 1000)
+    circle = np.zeros(len(apple_y))
+    for i in range(len(apple_y)):
+        y = apple_y[i]
+        circle[i] = MMMadj.left_circle(y, radius, center_x, center_y)
 
     # Plots
     fig, ax = plt.subplots()
-    # ax.set_xlim(np.min(all_x_pos) - 0.1, np.max(all_x_pos) + 0.1)
-    # ax.set_ylim(np.min(all_y_pos) - 0.1, np.max(all_y_pos) + 0.1)
+    ax.set_xlim(-0.05, 0.225)
+    ax.set_ylim(np.min(all_y_pos) - 0.1, np.max(all_y_pos) + 0.1)
     ax.set_xlabel('x Position [m]')
     ax.set_ylabel('y Position [m]')
     ax.set_title('MMM Bouncing Simulation')
     ax.grid(True)
-    ax.plot(apple_x, circle_top, 'r-')
-    ax.plot(apple_x, circle_bottom, 'r-')
+    ax.plot(circle, apple_y, 'r-')
+    ax.plot((2*center_x)-circle, apple_y, 'r-') # mirror to create right side of apple
 
     # Dynamic object positions connected by a line
-    line, = ax.plot([], [], 'ro-', label='Nodes')  # Single line connecting nodes
+    line, = ax.plot([], [], 'bo-', label='Nodes')  # Line connecting original nodes
+    scatter_mirrored, = ax.plot([], [], 'bo-', label='Mirrored Nodes')  # Scatter plot for mirrored nodes
 
     def init():
-        # Initialize the line as empty
+        # Initialize the line and scatter plot as empty
         line.set_data([], [])
-        return line,
+        scatter_mirrored.set_data([], [])
+        return line, scatter_mirrored
 
     def update(frame):
         # Update the line connecting all nodes
         x_data = all_x_pos[:, frame]
         y_data = all_y_pos[:, frame]
+        
+        # Mirroring x data about the center_x
+        mirrored_x_data = 2 * center_x - x_data
+        
+        # Plot the line for the original beam (connecting nodes)
         line.set_data(x_data, y_data)
-        return line,
+        
+        # Plot the mirrored positions (without connecting with a line)
+        scatter_mirrored.set_data(mirrored_x_data, y_data)
+        
+        return line, scatter_mirrored
 
     # Skip every 500 frames for speed
     anim = FuncAnimation(fig, update, frames=range(0, Nsteps, 20), init_func=init, blit=True, interval=10)
@@ -112,7 +121,7 @@ def animate_simulation(all_x_pos, all_y_pos, totalTime, Nsteps, nv):
 
 if __name__ == '__main__':
     # Simulation Parameters
-    nv = 11  # number of nodes
+    nv = 5  # number of nodes
     dt = 1e-5
     totalTime = 0.1
     tol_dq = 1e-6
@@ -122,7 +131,7 @@ if __name__ == '__main__':
     r0 = 1e-3 # cross-sectional radius
     deltaL = RodLength / (nv - 1) # discrete length
     ndof = 3 * nv
-    Y = 1e9 # Young's modulus
+    Y = 200e9 # Young's modulus
     rho = 7000 # Density
     mass = 0.01 # mass of each nodes
     EI = Y * np.pi * r0**4 / 4
